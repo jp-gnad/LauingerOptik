@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lauinger Optik | Interaktives Linsensystem</title>
+  <meta
+    name="description"
+    content="Interaktives GitHub-Pages-Tool zur Auslegung eines optischen Linsensystems mit Objekt, mehreren Linsen, Blenden, Rechenweg und Strahlengang."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero panel">
+      <div class="hero-copy">
+        <p class="eyebrow">GitHub Pages • Paraxiale Optik</p>
+        <h1>Optisches Linsensystem interaktiv auslegen</h1>
+        <p class="hero-text">
+          Stelle Objekt, mehrere Linsen, freie Abstände und manuelle Blenden ein.
+          Die Seite berechnet Bildlage, Bildgröße, Abbildungsfall und zeigt den
+          kompletten Rechenweg sowie Bild- und Öffnungsstrahlengang.
+        </p>
+      </div>
+      <div id="heroStats" class="hero-stats" aria-live="polite"></div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel control-panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Aufbau</p>
+            <h2>System konfigurieren</h2>
+          </div>
+          <p class="section-copy">
+            Alle axialen Positionen beziehen sich auf den Systemnullpunkt bei
+            <strong>0 mm</strong>. Das Objekt liegt links davon.
+          </p>
+        </div>
+
+        <section class="config-group">
+          <div class="group-header">
+            <h3>Objekt</h3>
+            <span class="pill">Eingabe in mm</span>
+          </div>
+          <div class="form-grid">
+            <label class="field">
+              <span>Objektabstand vor System</span>
+              <input id="objectDistance" type="number" min="1" step="1">
+            </label>
+            <label class="field">
+              <span>Objektgröße</span>
+              <input id="objectHeight" type="number" step="0.1">
+            </label>
+          </div>
+        </section>
+
+        <section class="config-group">
+          <div class="group-header">
+            <h3>Optische Elemente</h3>
+            <span class="pill" id="elementCount"></span>
+          </div>
+          <div class="toolbar">
+            <button id="addLensButton" class="action-button primary" type="button">Linse hinzufügen</button>
+            <button id="addApertureButton" class="action-button" type="button">Blende hinzufügen</button>
+            <button id="resetButton" class="ghost-button" type="button">Demo zurücksetzen</button>
+          </div>
+          <div id="elementList" class="element-list"></div>
+        </section>
+      </aside>
+
+      <section class="results-column">
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Ergebnis</p>
+              <h2>Abbildung und Systemdaten</h2>
+            </div>
+            <p class="section-copy">
+              Die Berechnung nutzt ein paraxiales Dünnlinsenmodell mit
+              Freiraummatrizen und Blendenbegrenzung.
+            </p>
+          </div>
+          <div id="summaryCards" class="summary-grid"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Visualisierung</p>
+              <h2>Strahlengänge</h2>
+            </div>
+            <p class="section-copy">
+              Oben: Bildstrahlengang vom Objektpunkt. Unten: Öffnungsstrahlengang
+              vom achsnahen Punkt über die Aperturbegrenzung.
+            </p>
+          </div>
+
+          <div class="diagram-stack">
+            <article class="diagram-card">
+              <div class="diagram-header">
+                <h3>Bildstrahlengang</h3>
+                <span class="pill subtle">Objektkante</span>
+              </div>
+              <svg id="imageRaySvg" class="ray-diagram" viewBox="0 0 1200 420" role="img" aria-label="Bildstrahlengang"></svg>
+            </article>
+
+            <article class="diagram-card">
+              <div class="diagram-header">
+                <h3>Öffnungsstrahlengang</h3>
+                <span class="pill subtle">Achsnaher Punkt</span>
+              </div>
+              <svg id="apertureRaySvg" class="ray-diagram" viewBox="0 0 1200 420" role="img" aria-label="Öffnungsstrahlengang"></svg>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel split-panel">
+          <article>
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Rechnung</p>
+                <h2>Rechenweg</h2>
+              </div>
+            </div>
+            <div id="calcSteps" class="content-stack"></div>
+          </article>
+
+          <article>
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Geometrie</p>
+                <h2>Abstände und Hinweise</h2>
+              </div>
+            </div>
+            <div id="distanceSummary" class="content-stack"></div>
+            <div id="notes" class="notice-list"></div>
+          </article>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
