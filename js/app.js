@@ -315,10 +315,28 @@ function isAutoLabel(label, type) {
 
 function getElementDisplayLabel(element) {
   if (element.autoLabel || !String(element.label || "").trim()) {
-    return getDefaultLabel(element.type, extractIndex(element.id));
+    return getDefaultLabel(element.type, getAutoLabelIndex(element));
   }
 
   return element.label;
+}
+
+function getAutoLabelIndex(element) {
+  const sameTypeElements = state.elements
+    .filter((entry) => entry.type === element.type)
+    .slice()
+    .sort(compareElementsForAutoLabel);
+  const currentIndex = sameTypeElements.findIndex((entry) => entry.id === element.id);
+
+  return currentIndex >= 0 ? currentIndex + 1 : extractIndex(element.id);
+}
+
+function compareElementsForAutoLabel(left, right) {
+  if (left.position !== right.position) {
+    return left.position - right.position;
+  }
+
+  return String(left.id).localeCompare(String(right.id), getLocale());
 }
 
 function renderControls() {
