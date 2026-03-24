@@ -3005,3 +3005,1229 @@ function formatCalcSignedMillimeterText(value) {
 function formatCalcMagnificationText(value) {
   return Number.isFinite(value) ? `${formatNumber(value)}x` : t("undefinedValue");
 }
+
+function getDefaultState() {
+  return {
+    object: {
+      sourceMode: "object",
+      distance: defaultState.object?.distance ?? 320,
+      height: defaultState.object?.height ?? 28,
+    },
+    elements: clone(defaultState.elements),
+  };
+}
+
+function normalizeSourceMode(value) {
+  return value === "infinity" ? "infinity" : "object";
+}
+
+function initialize() {
+  refs.sourceModeLabel = document.querySelector("#sourceModeLabel");
+  refs.sourceMode = document.querySelector("#sourceMode");
+  refs.objectDistanceField = document.querySelector("#objectDistanceField");
+
+  applyLanguage(language);
+  applyTheme(loadTheme());
+  syncObjectInputs();
+  renderControls();
+  renderOutputs();
+  bindEvents();
+}
+
+function bindEvents() {
+  refs.languageSelect.addEventListener("change", (event) => {
+    language = normalizeLanguage(event.target.value);
+    applyLanguage(language);
+    saveLanguage(language);
+    renderControls();
+    renderOutputs();
+  });
+
+  refs.themeToggleButton.addEventListener("click", () => {
+    const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(nextTheme);
+    saveTheme(nextTheme);
+  });
+
+  refs.downloadImageRayButton.addEventListener("click", () => {
+    downloadSvgAsPng(refs.imageRaySvg, "image-ray-path.png");
+  });
+
+  refs.downloadApertureRayButton.addEventListener("click", () => {
+    downloadSvgAsPng(refs.apertureRaySvg, "aperture-ray-path.png");
+  });
+
+  refs.sourceMode.addEventListener("change", (event) => {
+    state.object.sourceMode = normalizeSourceMode(event.target.value);
+    saveState();
+    syncObjectInputs();
+    renderOutputs();
+  });
+
+  refs.objectDistance.addEventListener("input", (event) => {
+    state.object.distance = toNumber(event.target.value, state.object.distance);
+    saveState();
+    renderOutputs();
+  });
+
+  refs.objectHeight.addEventListener("input", (event) => {
+    state.object.height = toNumber(event.target.value, state.object.height);
+    saveState();
+    renderOutputs();
+  });
+
+  refs.addLensButton.addEventListener("click", () => {
+    state.elements.push(createLens());
+    sortElementsInState();
+    saveState();
+    renderControls();
+    renderOutputs();
+  });
+
+  refs.addApertureButton.addEventListener("click", () => {
+    state.elements.push(createAperture());
+    sortElementsInState();
+    saveState();
+    renderControls();
+    renderOutputs();
+  });
+
+  refs.resetButton.addEventListener("click", () => {
+    state = getDefaultState();
+    counters = buildCounters(state.elements);
+    saveState();
+    syncObjectInputs();
+    renderControls();
+    renderOutputs();
+  });
+
+  refs.elementList.addEventListener("input", (event) => {
+    const target = event.target;
+    const elementId = target.dataset.id;
+    const field = target.dataset.field;
+
+    if (!elementId || !field) {
+      return;
+    }
+
+    const element = state.elements.find((entry) => entry.id === elementId);
+    if (!element) {
+      return;
+    }
+
+    if (field === "label") {
+      element.label = target.value;
+      element.autoLabel = target.value.trim() === "";
+    } else {
+      element[field] = toNumber(target.value, element[field]);
+    }
+
+    saveState();
+    renderOutputs();
+  });
+
+  refs.elementList.addEventListener("change", (event) => {
+    const target = event.target;
+    if (target.dataset.field === "position") {
+      sortElementsInState();
+      saveState();
+      renderControls();
+      renderOutputs();
+    }
+  });
+
+  refs.elementList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove]");
+    if (!button) {
+      return;
+    }
+
+    const elementId = button.dataset.remove;
+    state.elements = state.elements.filter((element) => element.id !== elementId);
+    saveState();
+    renderControls();
+    renderOutputs();
+  });
+}
+
+function applyLanguage(nextLanguage) {
+  language = normalizeLanguage(nextLanguage);
+  document.documentElement.lang = language;
+  document.title = t("documentTitle");
+  refs.metaDescription.setAttribute("content", t("metaDescription"));
+  refs.languageSelect.value = language;
+  refs.languageSelect.setAttribute("aria-label", t("languageSelectAria"));
+  refs.heroEyebrow.textContent = t("heroEyebrow");
+  refs.languageSwitchCaption.textContent = t("languageSwitchCaption");
+  refs.themeToggleCaption.textContent = t("themeCaption");
+  refs.heroTitle.textContent = t("heroTitle");
+  refs.brandLink.setAttribute("aria-label", t("brandLinkAria"));
+  refs.heroText.textContent = t("heroText");
+  refs.controlKicker.textContent = t("controlKicker");
+  refs.controlTitle.textContent = t("controlTitle");
+  refs.controlCopy.innerHTML = t("controlCopy");
+  refs.objectSectionTitle.textContent = t("sourceSectionTitle");
+  refs.objectInputUnit.textContent = t("objectInputUnit");
+  refs.sourceModeLabel.textContent = t("sourceModeLabel");
+  refs.sourceMode.setAttribute("aria-label", t("sourceModeLabel"));
+  refs.sourceMode.querySelector('option[value="object"]').textContent = t("sourceModeObject");
+  refs.sourceMode.querySelector('option[value="infinity"]').textContent = t("sourceModeInfinity");
+  refs.objectDistanceLabel.textContent = t("objectDistanceLabel");
+  refs.objectHeightLabel.textContent = t("objectHeightLabel");
+  refs.elementsSectionTitle.textContent = t("elementsSectionTitle");
+  refs.addLensButton.textContent = t("addLens");
+  refs.addApertureButton.textContent = t("addAperture");
+  refs.resetButton.textContent = t("resetDemo");
+  refs.resultsKicker.textContent = t("resultsKicker");
+  refs.resultsTitle.textContent = t("resultsTitle");
+  refs.resultsCopy.textContent = t("resultsCopy");
+  refs.visualKicker.textContent = t("visualKicker");
+  refs.visualTitle.textContent = t("visualTitle");
+  refs.visualCopy.textContent = t("visualCopy");
+  refs.imageDiagramTitle.textContent = t("imageDiagramTitle");
+  refs.imageDiagramBadge.textContent = t("imageDiagramBadge");
+  refs.imageRaySvg.setAttribute("aria-label", t("imageDiagramAria"));
+  refs.downloadImageRayButton.textContent = "PNG";
+  refs.downloadImageRayButton.setAttribute("aria-label", `${t("imageDiagramTitle")} PNG`);
+  refs.apertureDiagramTitle.textContent = t("apertureDiagramTitle");
+  refs.apertureDiagramBadge.textContent = t("apertureDiagramBadge");
+  refs.apertureRaySvg.setAttribute("aria-label", t("apertureDiagramAria"));
+  refs.downloadApertureRayButton.textContent = "PNG";
+  refs.downloadApertureRayButton.setAttribute("aria-label", `${t("apertureDiagramTitle")} PNG`);
+  refs.calcKicker.textContent = t("calcKicker");
+  refs.calcTitle.textContent = t("calcTitle");
+  refs.geometryKicker.textContent = t("geometryKicker");
+  refs.geometryTitle.textContent = t("geometryTitle");
+  syncObjectInputs();
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+}
+
+function syncObjectInputs() {
+  const sourceMode = normalizeSourceMode(state.object?.sourceMode);
+  refs.sourceMode.value = sourceMode;
+  refs.objectDistance.value = state.object.distance;
+  refs.objectHeight.value = state.object.height;
+  updateSourceModeUI(sourceMode);
+}
+
+function updateSourceModeUI(sourceMode = normalizeSourceMode(state.object?.sourceMode)) {
+  const isInfinitySource = sourceMode === "infinity";
+
+  refs.objectDistanceField.hidden = isInfinitySource;
+  refs.objectDistance.disabled = isInfinitySource;
+  refs.objectHeightLabel.textContent = t(isInfinitySource ? "infinityBeamHeightLabel" : "objectHeightLabel");
+  refs.controlCopy.innerHTML = t(isInfinitySource ? "controlCopyInfinity" : "controlCopy");
+  refs.visualCopy.textContent = t(isInfinitySource ? "visualCopyInfinity" : "visualCopy");
+  refs.imageDiagramBadge.textContent = t(isInfinitySource ? "imageDiagramBadgeInfinity" : "imageDiagramBadge");
+}
+
+function applyTheme(theme) {
+  const normalizedTheme = theme === "dark" ? "dark" : "light";
+
+  if (normalizedTheme === "dark") {
+    document.documentElement.dataset.theme = "dark";
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+
+  refs.themeToggleButton.setAttribute("aria-pressed", String(normalizedTheme === "dark"));
+  refs.themeToggleLabel.textContent = normalizedTheme === "dark" ? t("themeDark") : t("themeLight");
+}
+
+function sanitizeState(inputState) {
+  const baseState = getDefaultState();
+  const objectDistance = clamp(toNumber(inputState.object?.distance, baseState.object.distance), 1, 100000);
+  const objectHeight = toNumber(inputState.object?.height, baseState.object.height);
+  const elements = (Array.isArray(inputState.elements) ? inputState.elements : baseState.elements)
+    .map((element, index) => sanitizeElement(element, index))
+    .sort(sortByPosition);
+
+  return {
+    object: {
+      sourceMode: normalizeSourceMode(inputState.object?.sourceMode),
+      distance: objectDistance,
+      height: objectHeight,
+    },
+    elements,
+  };
+}
+
+function loadState() {
+  const baseState = getDefaultState();
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return baseState;
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      object: {
+        sourceMode: normalizeSourceMode(parsed.object?.sourceMode),
+        distance: toNumber(parsed.object?.distance, baseState.object.distance),
+        height: toNumber(parsed.object?.height, baseState.object.height),
+      },
+      elements: Array.isArray(parsed.elements) ? parsed.elements : baseState.elements,
+    };
+  } catch (error) {
+    return baseState;
+  }
+}
+
+function computeSystem(config) {
+  const sourceMode = normalizeSourceMode(config.object.sourceMode);
+  const isInfinitySource = sourceMode === "infinity";
+  const objectZ = isInfinitySource ? 0 : -config.object.distance;
+  const elements = [...config.elements].sort(sortByPosition);
+  const lenses = elements.filter((element) => element.type === "lens");
+  const hasPoweredLens = lenses.some((lens) => Math.abs(lens.power) > EPSILON);
+
+  const matrixSteps = [];
+  const enrichedElements = [];
+  let currentMatrix = identityMatrix();
+  let previousZ = objectZ;
+
+  for (const element of elements) {
+    const distance = element.position - previousZ;
+    const transfer = translationMatrix(distance);
+    const matrixBefore = multiplyMatrices(transfer, currentMatrix);
+
+    matrixSteps.push({
+      kind: "space",
+      label: t("spaceToLabel", { label: getElementDisplayLabel(element) }),
+      distance,
+      matrix: transfer,
+      cumulative: matrixBefore,
+    });
+
+    let matrixAfter = matrixBefore;
+    let focalLength = null;
+
+    if (element.type === "lens") {
+      focalLength = powerToFocalLength(element.power);
+      const matrix = Number.isFinite(focalLength) ? lensMatrix(focalLength) : identityMatrix();
+      matrixAfter = multiplyMatrices(matrix, matrixBefore);
+      matrixSteps.push({
+        kind: "lens",
+        label: getElementDisplayLabel(element),
+        power: element.power,
+        focalLength,
+        matrix,
+        cumulative: matrixAfter,
+      });
+    } else {
+      matrixSteps.push({
+        kind: "aperture",
+        label: getElementDisplayLabel(element),
+        diameter: element.diameter,
+        matrix: identityMatrix(),
+        cumulative: matrixAfter,
+      });
+    }
+
+    enrichedElements.push({
+      ...element,
+      displayLabel: getElementDisplayLabel(element),
+      gapFromPrevious: distance,
+      matrixBefore,
+      matrixAfter,
+      focalLength,
+      radius: Math.max(0.5, element.diameter / 2),
+    });
+
+    currentMatrix = matrixAfter;
+    previousZ = element.position;
+  }
+
+  const overallMatrix = currentMatrix;
+  const [[a, b], [c, d]] = overallMatrix;
+  const lastPosition = elements.length ? elements[elements.length - 1].position : 0;
+
+  let imageDistance = null;
+  let imagePosition = null;
+  let imageHeight = null;
+  let magnification = null;
+  let imageNature = t("noImage");
+
+  if (hasPoweredLens) {
+    if (isInfinitySource) {
+      if (Math.abs(c) > EPSILON) {
+        imageDistance = -a / c;
+        imagePosition = lastPosition + imageDistance;
+        imageNature = t("parallelFocusCase");
+      } else {
+        imageNature = t("imageAtInfinity");
+      }
+    } else if (Math.abs(d) > EPSILON) {
+      imageDistance = -b / d;
+      imagePosition = lastPosition + imageDistance;
+      magnification = 1 / d;
+      imageHeight = magnification * config.object.height;
+      imageNature = describeImageCase(imageDistance, magnification);
+    } else {
+      imageNature = t("imageAtInfinity");
+    }
+  }
+
+  const imagePlaneMatrix = Number.isFinite(imageDistance)
+    ? multiplyMatrices(translationMatrix(imageDistance), overallMatrix)
+    : null;
+
+  const apertureStop = findApertureStop(enrichedElements);
+  const imageRays = apertureStop
+    ? buildImageRays({
+        sourceMode,
+        objectY: config.object.height,
+        objectZ,
+        apertureStop,
+        elements: enrichedElements,
+        imagePosition,
+        lastPosition,
+      })
+    : [];
+
+  const apertureRays = apertureStop
+    ? buildApertureRays({
+        objectZ,
+        apertureStop,
+        elements: enrichedElements,
+        imagePosition,
+        lastPosition,
+      })
+    : [];
+
+  const sequentialSteps = buildSequentialLensSteps({
+    sourceMode,
+    objectZ,
+    objectHeight: config.object.height,
+    lenses,
+  });
+
+  const distances = buildDistanceSummary({
+    sourceMode,
+    objectZ,
+    elements: enrichedElements,
+    imagePosition,
+  });
+
+  const notes = [];
+  if (!lenses.length) {
+    notes.push({ tone: "warning", text: t("needLensNote") });
+  }
+  if (hasPoweredLens && !Number.isFinite(imageDistance)) {
+    notes.push({ tone: "warning", text: t("infinityNote") });
+  }
+  if (apertureStop) {
+    notes.push({
+      tone: "success",
+      text: t("apertureStopNote", {
+        label: apertureStop.displayLabel,
+        radius: formatNumber(apertureStop.radius),
+      }),
+    });
+  }
+
+  for (const ray of [...imageRays, ...apertureRays]) {
+    if (ray.clippedBy) {
+      notes.push({
+        tone: "warning",
+        text: t("clippedRayNote", {
+          ray: ray.label,
+          element: ray.clippedBy,
+        }),
+      });
+    }
+  }
+
+  return {
+    config,
+    sourceMode,
+    objectZ,
+    elements,
+    enrichedElements,
+    lenses,
+    hasPoweredLens,
+    overallMatrix,
+    imagePlaneMatrix,
+    imageDistance,
+    imagePosition,
+    imageHeight,
+    magnification,
+    imageNature,
+    apertureStop,
+    imageRays,
+    apertureRays,
+    sequentialSteps,
+    matrixSteps,
+    distances,
+    notes,
+  };
+}
+
+function buildSequentialLensSteps({ sourceMode, objectZ, objectHeight, lenses }) {
+  const steps = [];
+  let currentObjectPosition = normalizeSourceMode(sourceMode) === "infinity" ? Infinity : objectZ;
+  let currentObjectHeight = objectHeight;
+  let objectAtInfinity = normalizeSourceMode(sourceMode) === "infinity";
+
+  for (const lens of lenses) {
+    const focalLength = powerToFocalLength(lens.power);
+
+    if (!Number.isFinite(focalLength)) {
+      steps.push({
+        label: getElementDisplayLabel(lens),
+        power: lens.power,
+        focalLength: null,
+        note: t("noFocusNote"),
+      });
+      continue;
+    }
+
+    const objectDistance = objectAtInfinity ? Infinity : lens.position - currentObjectPosition;
+    let imageDistance = null;
+    let imagePosition = null;
+    let magnification = null;
+    let imageHeight = null;
+    let note = "";
+
+    if (!Number.isFinite(objectDistance)) {
+      imageDistance = focalLength;
+      imagePosition = lens.position + focalLength;
+      note = t("parallelImageNote");
+      currentObjectPosition = imagePosition;
+      currentObjectHeight = null;
+      objectAtInfinity = false;
+    } else if (Math.abs((1 / focalLength) - (1 / objectDistance)) < EPSILON) {
+      imageDistance = Infinity;
+      imagePosition = Infinity;
+      note = t("infiniteIntermediateNote");
+      objectAtInfinity = true;
+      currentObjectPosition = Infinity;
+      currentObjectHeight = null;
+    } else {
+      imageDistance = 1 / ((1 / focalLength) - (1 / objectDistance));
+      imagePosition = lens.position + imageDistance;
+      magnification = -imageDistance / objectDistance;
+      imageHeight = currentObjectHeight === null ? null : currentObjectHeight * magnification;
+      note = objectDistance > 0 ? t("realObjectNote") : t("virtualObjectNote");
+      currentObjectPosition = imagePosition;
+      currentObjectHeight = imageHeight;
+      objectAtInfinity = false;
+    }
+
+    steps.push({
+      label: getElementDisplayLabel(lens),
+      power: lens.power,
+      focalLength,
+      objectDistance,
+      imageDistance,
+      magnification,
+      imageHeight,
+      imagePosition,
+      note,
+    });
+  }
+
+  return steps;
+}
+
+function buildDistanceSummary({ sourceMode, objectZ, elements, imagePosition }) {
+  const list = [];
+  const isInfinitySource = normalizeSourceMode(sourceMode) === "infinity";
+
+  if (elements.length) {
+    list.push({
+      title: t(isInfinitySource ? "originToFirstElement" : "objectToFirstElement"),
+      value: `${formatNumber(elements[0].position - objectZ)} mm`,
+    });
+  }
+
+  for (let index = 1; index < elements.length; index += 1) {
+    list.push({
+      title: t("elementToElement", {
+        from: elements[index - 1].displayLabel || getElementDisplayLabel(elements[index - 1]),
+        to: elements[index].displayLabel || getElementDisplayLabel(elements[index]),
+      }),
+      value: `${formatNumber(elements[index].position - elements[index - 1].position)} mm`,
+    });
+  }
+
+  if (elements.length && Number.isFinite(imagePosition)) {
+    const last = elements[elements.length - 1];
+    list.push({
+      title: t("lastElementToImage", {
+        last: last.displayLabel || getElementDisplayLabel(last),
+      }),
+      value: `${formatNumber(imagePosition - last.position)} mm`,
+    });
+  }
+
+  if (Number.isFinite(imagePosition)) {
+    list.push({
+      title: t("absoluteImagePosition"),
+      value: `${formatNumber(imagePosition)} mm`,
+    });
+  }
+
+  return list;
+}
+
+function buildImageRays({ sourceMode, objectY, objectZ, apertureStop, elements, imagePosition, lastPosition }) {
+  const radius = apertureStop.radius;
+  const targets = [
+    { label: t("principalRay"), targetY: 0, color: "#0d8b8d" },
+    { label: t("upperMarginalRay"), targetY: radius, color: "#d38b2e" },
+    { label: t("lowerMarginalRay"), targetY: -radius, color: "#d55d42" },
+  ];
+
+  if (normalizeSourceMode(sourceMode) === "infinity") {
+    const beamOffset = Math.max(4, Math.min(radius * 0.45, 14));
+    const startHeights = [
+      objectY + beamOffset,
+      objectY,
+      objectY - beamOffset,
+    ];
+
+    return targets.map((target, index) => traceRay({
+      label: target.label,
+      color: target.color,
+      objectY: startHeights[index],
+      initialSlope: 0,
+      objectZ,
+      elements,
+      imagePosition,
+      lastPosition,
+    }));
+  }
+
+  return targets.map((target) => {
+    const slope = solveSlopeToPlane({
+      objectY,
+      targetY: target.targetY,
+      plane: apertureStop,
+      objectZ,
+    });
+
+    return traceRay({
+      label: target.label,
+      color: target.color,
+      objectY,
+      initialSlope: slope,
+      objectZ,
+      elements,
+      imagePosition,
+      lastPosition,
+    });
+  });
+}
+
+function renderHeroStats(result) {
+  const lensCount = result.lenses.length;
+  const apertureCount = result.elements.filter((element) => element.type === "aperture").length;
+  const stopLabel = result.apertureStop
+    ? result.apertureStop.displayLabel || result.apertureStop.label
+    : t("noneShort");
+
+  return [
+    statCard(t("heroStatLenses"), `${lensCount}`),
+    statCard(t("heroStatManualApertures"), `${apertureCount}`),
+    statCard(t("heroStatApertureLimit"), stopLabel),
+  ].join("");
+}
+
+function renderSummaryCards(result) {
+  const isInfinitySource = result.sourceMode === "infinity";
+  const imageDistanceText = Number.isFinite(result.imageDistance)
+    ? `${formatNumber(result.imageDistance)} mm`
+    : result.hasPoweredLens ? t("infinityValue") : t("undefinedValue");
+  const imageHeightText = Number.isFinite(result.imageHeight)
+    ? `${formatNumber(result.imageHeight)} mm`
+    : t("undefinedValue");
+  const magnificationText = Number.isFinite(result.magnification)
+    ? `${formatNumber(result.magnification)}x`
+    : t("undefinedValue");
+  const stopText = result.apertureStop
+    ? `${result.apertureStop.displayLabel || result.apertureStop.label} (${formatNumber(result.apertureStop.diameter)} mm)`
+    : t("noLimit");
+  const imagePositionText = Number.isFinite(result.imagePosition)
+    ? `${formatNumber(result.imagePosition)} mm`
+    : result.hasPoweredLens ? t("infinityValue") : t("undefinedValue");
+
+  if (isInfinitySource) {
+    return [
+      summaryCard(
+        t("summaryImageCaseTitle"),
+        result.imageNature,
+        t("summaryImageCaseCopyInfinity")
+      ),
+      summaryCard(
+        t("summaryFocusDistanceTitle"),
+        imageDistanceText,
+        t("summaryImageDistanceCopy")
+      ),
+      summaryCard(
+        t("summaryAbsoluteFocusPositionTitle"),
+        imagePositionText,
+        t("summaryAbsoluteFocusPositionCopy")
+      ),
+      summaryCard(
+        t("infinityBeamHeightLabel"),
+        `${formatNumber(result.config.object.height)} mm`,
+        t("summaryBeamHeightCopy")
+      ),
+      summaryCard(
+        t("summaryApertureLimitTitle"),
+        stopText,
+        t("summaryApertureLimitCopy")
+      ),
+      summaryCard(
+        t("summarySystemMatrixTitle"),
+        formatMatrix(result.overallMatrix),
+        t("summarySystemMatrixCopy")
+      ),
+    ].join("");
+  }
+
+  return [
+    summaryCard(
+      t("summaryImageCaseTitle"),
+      result.imageNature,
+      t("summaryImageCaseCopy")
+    ),
+    summaryCard(
+      t("summaryImageDistanceTitle"),
+      imageDistanceText,
+      t("summaryImageDistanceCopy")
+    ),
+    summaryCard(
+      t("summaryImageSizeTitle"),
+      imageHeightText,
+      t("summaryImageSizeCopy")
+    ),
+    summaryCard(
+      t("summaryMagnificationTitle"),
+      magnificationText,
+      t("summaryMagnificationCopy")
+    ),
+    summaryCard(
+      t("summaryApertureLimitTitle"),
+      stopText,
+      t("summaryApertureLimitCopy")
+    ),
+    summaryCard(
+      t("summarySystemMatrixTitle"),
+      formatMatrix(result.overallMatrix),
+      t("summarySystemMatrixCopy")
+    ),
+  ].join("");
+}
+
+function renderDistanceCards(result) {
+  const cards = [];
+
+  if (result.distances.length) {
+    cards.push(`
+      <section class="distance-card">
+        <h3>${escapeHtml(t("distanceSectionTitle"))}</h3>
+        <div class="distance-list">
+          ${result.distances.map((distance) => `
+            <article class="step-card">
+              <strong>${escapeHtml(distance.title)}</strong>
+              <p>${escapeHtml(distance.value)}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `);
+  }
+
+  if (result.sourceMode === "infinity") {
+    cards.push(`
+      <section class="distance-card">
+        <h3>${escapeHtml(t("sourceDataTitle"))}</h3>
+        <div class="distance-list">
+          <article class="step-card">
+            <strong>${escapeHtml(t("sourceModeLabel"))}</strong>
+            <p>${escapeHtml(t("sourceModeInfinity"))}</p>
+          </article>
+          <article class="step-card">
+            <strong>${escapeHtml(t("infinityBeamHeightLabel"))}</strong>
+            <p>${escapeHtml(`${formatNumber(result.config.object.height)} mm`)}</p>
+          </article>
+        </div>
+      </section>
+    `);
+  } else {
+    cards.push(`
+      <section class="distance-card">
+        <h3>${escapeHtml(t("objectDataTitle"))}</h3>
+        <p>${escapeHtml(t("objectPositionText", { distance: formatNumber(-result.objectZ) }))}</p>
+        <p>${escapeHtml(t("objectHeightText", { height: formatNumber(result.config.object.height) }))}</p>
+      </section>
+    `);
+  }
+
+  return cards.join("");
+}
+
+function renderNotes(result) {
+  if (!result.notes.length) {
+    return `<div class="notice success"><p>${escapeHtml(t("noNotes"))}</p></div>`;
+  }
+
+  return result.notes.map((note) => `
+    <article class="notice ${note.tone === "success" ? "success" : ""}">
+      <p>${escapeHtml(note.text)}</p>
+    </article>
+  `).join("");
+}
+
+function renderSvg(result, mode) {
+  const rays = mode === "image" ? result.imageRays : result.apertureRays;
+  const objectY = mode === "image" ? result.config.object.height : 0;
+  const isInfinitySource = result.sourceMode === "infinity";
+  const stop = result.apertureStop;
+  const extents = collectExtents(result, rays);
+  const geometry = buildGeometry(extents);
+
+  const grid = buildGrid(geometry);
+  const axis = `<line class="svg-axis" x1="${PAD_X}" y1="${AXIS_Y}" x2="${SVG_WIDTH - PAD_X}" y2="${AXIS_Y}"></line>`;
+  const labels = buildAxisLabels(geometry, result);
+  const elements = buildElementGraphics(result.enrichedElements, geometry, stop);
+  const objectGraphic = isInfinitySource
+    ? ""
+    : buildArrow({
+        x: geometry.toX(result.objectZ),
+        height: objectY,
+        className: "svg-object",
+        label: mode === "image" ? t("objectLabel") : t("axisLabel"),
+        geometry,
+        dashed: false,
+      });
+  const imageGraphic = isInfinitySource
+    ? (Number.isFinite(result.imagePosition)
+        ? buildFocusMarker({
+            x: geometry.toX(result.imagePosition),
+            label: t("focusLabel"),
+            geometry,
+          })
+        : "")
+    : (Number.isFinite(result.imagePosition) && Number.isFinite(result.imageHeight)
+        ? buildArrow({
+            x: geometry.toX(result.imagePosition),
+            height: result.imageHeight,
+            className: "svg-image",
+            label: t("imageLabel"),
+            geometry,
+            dashed: result.enrichedElements.length && result.imagePosition < result.enrichedElements[result.enrichedElements.length - 1].position,
+          })
+        : "");
+
+  const rayMarkup = rays.map((ray) => buildRayMarkup(ray, geometry)).join("");
+  const title = mode === "image" ? t("imageRayTitle") : t("apertureRayTitle");
+
+  return `
+    <title>${title}</title>
+    ${grid}
+    ${axis}
+    ${elements}
+    ${objectGraphic}
+    ${imageGraphic}
+    ${rayMarkup}
+    ${labels}
+  `;
+}
+
+function buildAxisLabels(geometry, result) {
+  const labels = [];
+  const total = geometry.zMax - geometry.zMin;
+  const step = chooseGridStep(total);
+
+  for (let tick = Math.ceil(geometry.zMin / step) * step; tick <= geometry.zMax; tick += step) {
+    const x = geometry.toX(tick);
+    labels.push(`<text class="svg-label" x="${x}" y="${SVG_HEIGHT - 12}" text-anchor="middle">${escapeHtml(`${formatNumber(tick, 0)} mm`)}</text>`);
+  }
+
+  if (result.apertureStop) {
+    labels.push(`
+      <text class="svg-label strong" x="${geometry.toX(result.apertureStop.position)}" y="${PAD_Y - 10}" text-anchor="middle">
+        ${escapeHtml(t("apertureStopLabel", {
+          label: result.apertureStop.displayLabel || result.apertureStop.label,
+        }))}
+      </text>
+    `);
+  }
+
+  return labels.join("");
+}
+
+function buildElementGraphics(elements, geometry, apertureStop) {
+  return elements.map((element) => {
+    const x = geometry.toX(element.position);
+    const top = geometry.toY(element.radius);
+    const bottom = geometry.toY(-element.radius);
+    const highlight = apertureStop && apertureStop.id === element.id
+      ? `<rect class="svg-stop-highlight" x="${x - 18}" y="${top - 12}" width="36" height="${(bottom - top) + 24}" rx="14"></rect>`
+      : "";
+    const label = element.displayLabel || element.label;
+
+    if (element.type === "lens") {
+      return `
+        ${highlight}
+        <path d="${buildLensPath(x, top, bottom, element.power >= 0)}" fill="rgba(13, 139, 141, 0.16)" stroke="#0d8b8d" stroke-width="3"></path>
+        <text class="svg-label strong" x="${x}" y="${top - 16}" text-anchor="middle">${escapeHtml(label)}</text>
+      `;
+    }
+
+    const gapTop = geometry.toY(element.radius);
+    const gapBottom = geometry.toY(-element.radius);
+    return `
+      ${highlight}
+      <rect x="${x - 6}" y="${PAD_Y}" width="12" height="${gapTop - PAD_Y}" rx="6" fill="#d38b2e"></rect>
+      <rect x="${x - 6}" y="${gapBottom}" width="12" height="${SVG_HEIGHT - PAD_Y - gapBottom}" rx="6" fill="#d38b2e"></rect>
+      <text class="svg-label strong" x="${x}" y="${gapTop - 16}" text-anchor="middle">${escapeHtml(label)}</text>
+    `;
+  }).join("");
+}
+
+function buildFocusMarker({ x, label, geometry }) {
+  const y = geometry.toY(0);
+
+  return `
+    <g>
+      <circle class="svg-focus" cx="${x}" cy="${y}" r="7"></circle>
+      <text class="svg-label strong" x="${x}" y="${y - 16}" text-anchor="middle">${escapeHtml(label)}</text>
+    </g>
+  `;
+}
+
+function renderCalculationBlocks(result) {
+  const isInfinitySource = result.sourceMode === "infinity";
+  const stopText = result.apertureStop
+    ? `${result.apertureStop.displayLabel || result.apertureStop.label} (${formatNumber(result.apertureStop.diameter)} mm)`
+    : t("noLimit");
+  const overviewMetrics = (isInfinitySource
+    ? [
+        renderCalcMetricCard(t("sourceModeLabel"), t("sourceModeInfinity")),
+        renderCalcMetricCard(t("infinityBeamHeightLabel"), `${formatNumber(result.config.object.height)} mm`),
+        renderCalcMetricCard(t("summaryImageCaseTitle"), result.imageNature),
+        renderCalcMetricCard(t("summaryFocusDistanceTitle"), formatCalcDistanceText(result.imageDistance, result.hasPoweredLens)),
+        renderCalcMetricCard(t("summaryAbsoluteFocusPositionTitle"), formatCalcAbsolutePositionText(result.imagePosition, result.hasPoweredLens)),
+        renderCalcMetricCard(t("summaryApertureLimitTitle"), stopText),
+        renderCalcMetricCard(t("summarySystemMatrixTitle"), formatMatrix(result.overallMatrix), { code: true, wide: true }),
+      ]
+    : [
+        renderCalcMetricCard(t("objectDistanceLabel"), `${formatNumber(result.config.object.distance)} mm`),
+        renderCalcMetricCard(t("objectHeightLabel"), `${formatNumber(result.config.object.height)} mm`),
+        renderCalcMetricCard(t("summaryImageCaseTitle"), result.imageNature),
+        renderCalcMetricCard(t("summaryImageDistanceTitle"), formatCalcDistanceText(result.imageDistance, result.hasPoweredLens)),
+        renderCalcMetricCard(t("summaryMagnificationTitle"), formatCalcMagnificationText(result.magnification)),
+        renderCalcMetricCard(t("summaryImageSizeTitle"), formatCalcSignedMillimeterText(result.imageHeight)),
+        renderCalcMetricCard(t("summaryApertureLimitTitle"), stopText),
+        renderCalcMetricCard(t("summarySystemMatrixTitle"), formatMatrix(result.overallMatrix), { code: true, wide: true }),
+      ]).join("");
+
+  const matrixSequence = result.matrixSteps.length
+    ? result.matrixSteps.map((step, index) => renderCalcSequenceStep(step, index)).join("")
+    : `<div class="empty-state">${escapeHtml(t("calcNoLensSteps"))}</div>`;
+  const derivedLines = buildCalcDerivedLines(result);
+  const derivedMarkup = derivedLines.length
+    ? `
+      <div class="calc-derived">
+        ${derivedLines.map((line) => `
+          <article class="calc-formula-item">
+            <code class="calc-inline-code calc-inline-code--wrap">${escapeHtml(line)}</code>
+          </article>
+        `).join("")}
+      </div>
+    `
+    : "";
+
+  const stepCards = result.sequentialSteps.length
+    ? result.sequentialSteps.map((step) => renderCalcLensStepCard(step)).join("")
+    : `<div class="empty-state">${escapeHtml(t("calcNoLensSteps"))}</div>`;
+
+  return `
+    ${renderCalcAccordion(
+      t("resultsTitle"),
+      `<div class="calc-metric-grid">${overviewMetrics}</div>`,
+      "overview"
+    )}
+    ${renderCalcAccordion(
+      t("calcSystemMatrixTitle"),
+      `<div class="calc-sequence">${matrixSequence}</div>${derivedMarkup}`
+    )}
+    ${renderCalcAccordion(
+      t("calcIntermediateTitle"),
+      `<div class="step-grid">${stepCards}</div>`
+    )}
+  `;
+}
+
+function buildCalcDerivedLines(result) {
+  if (result.sourceMode === "infinity" && Number.isFinite(result.imageDistance) && result.imagePlaneMatrix) {
+    return [
+      t("matrixFocusPlaneLine", { distance: formatNumber(result.imageDistance) }),
+      t("matrixFocusPlaneMatrixLine", { matrix: formatMatrix(result.imagePlaneMatrix) }),
+    ];
+  }
+
+  if (Number.isFinite(result.imageDistance) && result.imagePlaneMatrix) {
+    return [
+      t("matrixImagePlaneLine", { distance: formatNumber(result.imageDistance) }),
+      t("matrixImagePlaneMatrixLine", { matrix: formatMatrix(result.imagePlaneMatrix) }),
+      t("matrixMagnificationLine", { value: formatNumber(result.magnification) }),
+      t("matrixImageHeightLine", { value: formatNumber(result.imageHeight) }),
+    ];
+  }
+
+  if (result.hasPoweredLens) {
+    return [t("matrixInfinityLine")];
+  }
+
+  return [];
+}
+
+function formatCalcAbsolutePositionText(value, hasPoweredLens) {
+  if (Number.isFinite(value)) {
+    return `${formatNumber(value)} mm`;
+  }
+  return hasPoweredLens ? t("infinityValue") : t("undefinedValue");
+}
+
+function getExtraTranslations() {
+  if (getExtraTranslations.cache) {
+    return getExtraTranslations.cache;
+  }
+
+  getExtraTranslations.cache = {
+    de: {
+      sourceSectionTitle: "Objekt / Quelle",
+      sourceModeLabel: "Quelle",
+      sourceModeObject: "Objektabbildung",
+      sourceModeInfinity: "Lichtstrahlen aus dem Unendlichen",
+      infinityBeamHeightLabel: "Strahlhoehe am Eintritt",
+      controlCopyInfinity: "Alle axialen Positionen beziehen sich auf den Systemnullpunkt bei <strong>0 mm</strong>. Das Parallelbuendel tritt dort von links als achsparalleles Licht ein.",
+      visualCopyInfinity: "Oben: achsparallele Lichtstrahlen aus dem Unendlichen. Unten: Oeffnungsstrahlengang des achsnahen Punktes ueber die Aperturbegrenzung.",
+      imageDiagramBadgeInfinity: "Parallelstrahlen",
+      parallelFocusCase: "Fokus eines achsparallelen Parallelbuendels",
+      originToFirstElement: "Systemnullpunkt bis erstes Element",
+      sourceDataTitle: "Quelldaten",
+      matrixFocusPlaneLine: "Fokusebene: q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_fokus = T(q) * M = {matrix}",
+      focusLabel: "Fokus",
+      summaryFocusDistanceTitle: "Fokusabstand",
+      summaryAbsoluteFocusPositionTitle: "Absolute Fokusposition",
+      summaryAbsoluteFocusPositionCopy: "Position der Fokusebene relativ zum Systemnullpunkt.",
+      summaryBeamHeightCopy: "Referenzhoehe des einfallenden Parallelbuendels bei z = 0 mm.",
+      summaryImageCaseCopyInfinity: "Beschreibt die Fokuslage fuer achsparalleles Licht statt einer endlichen Objektabbildung.",
+    },
+    en: {
+      sourceSectionTitle: "Object / Source",
+      sourceModeLabel: "Source",
+      sourceModeObject: "Finite object",
+      sourceModeInfinity: "Light rays from infinity",
+      infinityBeamHeightLabel: "Beam height at entry",
+      controlCopyInfinity: "All axial positions refer to the system origin at <strong>0 mm</strong>. The parallel bundle enters there from the left as an on-axis beam.",
+      visualCopyInfinity: "Top: parallel light rays from infinity. Bottom: aperture ray path of the near-axis point through the aperture stop.",
+      imageDiagramBadgeInfinity: "Parallel rays",
+      parallelFocusCase: "Focus of an on-axis parallel bundle",
+      originToFirstElement: "System origin to first element",
+      sourceDataTitle: "Source data",
+      matrixFocusPlaneLine: "Focus plane: q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_focus = T(q) * M = {matrix}",
+      focusLabel: "Focus",
+      summaryFocusDistanceTitle: "Focus distance",
+      summaryAbsoluteFocusPositionTitle: "Absolute focus position",
+      summaryAbsoluteFocusPositionCopy: "Position of the focus plane relative to the system origin.",
+      summaryBeamHeightCopy: "Reference height of the incoming parallel bundle at z = 0 mm.",
+      summaryImageCaseCopyInfinity: "Describes the focus position for on-axis parallel light instead of finite-object imaging.",
+    },
+    fr: {
+      sourceSectionTitle: "Objet / Source",
+      sourceModeLabel: "Source",
+      sourceModeObject: "Objet fini",
+      sourceModeInfinity: "Rayons lumineux venant de l'infini",
+      infinityBeamHeightLabel: "Hauteur du faisceau a l'entree",
+      controlCopyInfinity: "Toutes les positions axiales se referent a l'origine du systeme a <strong>0 mm</strong>. Le faisceau parallele y entre depuis la gauche comme lumiere axiale.",
+      visualCopyInfinity: "En haut : rayons paralleles venant de l'infini. En bas : trajet des rayons d'ouverture du point proche de l'axe a travers le diaphragme limitant.",
+      imageDiagramBadgeInfinity: "Rayons paralleles",
+      parallelFocusCase: "Foyer d'un faisceau parallele axial",
+      originToFirstElement: "Origine du systeme jusqu'au premier element",
+      sourceDataTitle: "Donnees de la source",
+      matrixFocusPlaneLine: "Plan focal : q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_focus = T(q) * M = {matrix}",
+      focusLabel: "Foyer",
+      summaryFocusDistanceTitle: "Distance focale image",
+      summaryAbsoluteFocusPositionTitle: "Position absolue du foyer",
+      summaryAbsoluteFocusPositionCopy: "Position du plan focal par rapport a l'origine du systeme.",
+      summaryBeamHeightCopy: "Hauteur de reference du faisceau parallele entrant a z = 0 mm.",
+      summaryImageCaseCopyInfinity: "Decrit la position du foyer pour une lumiere parallele axiale au lieu d'une image d'objet fini.",
+    },
+    es: {
+      sourceSectionTitle: "Objeto / Fuente",
+      sourceModeLabel: "Fuente",
+      sourceModeObject: "Objeto finito",
+      sourceModeInfinity: "Rayos de luz desde el infinito",
+      infinityBeamHeightLabel: "Altura del haz en la entrada",
+      controlCopyInfinity: "Todas las posiciones axiales se refieren al origen del sistema en <strong>0 mm</strong>. El haz paralelo entra alli desde la izquierda como luz axial.",
+      visualCopyInfinity: "Arriba: rayos paralelos desde el infinito. Abajo: recorrido del rayo de apertura del punto cercano al eje a traves del diafragma limitante.",
+      imageDiagramBadgeInfinity: "Rayos paralelos",
+      parallelFocusCase: "Foco de un haz paralelo axial",
+      originToFirstElement: "Origen del sistema al primer elemento",
+      sourceDataTitle: "Datos de la fuente",
+      matrixFocusPlaneLine: "Plano focal: q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_focus = T(q) * M = {matrix}",
+      focusLabel: "Foco",
+      summaryFocusDistanceTitle: "Distancia al foco",
+      summaryAbsoluteFocusPositionTitle: "Posicion absoluta del foco",
+      summaryAbsoluteFocusPositionCopy: "Posicion del plano focal respecto al origen del sistema.",
+      summaryBeamHeightCopy: "Altura de referencia del haz paralelo entrante en z = 0 mm.",
+      summaryImageCaseCopyInfinity: "Describe la posicion del foco para luz paralela axial en lugar de la formacion de imagen de un objeto finito.",
+    },
+    tr: {
+      sourceSectionTitle: "Nesne / Kaynak",
+      sourceModeLabel: "Kaynak",
+      sourceModeObject: "Sonlu nesne",
+      sourceModeInfinity: "Sonsuzdan gelen isik isinlari",
+      infinityBeamHeightLabel: "Giriste isik demeti yuksekligi",
+      controlCopyInfinity: "Tum eksensel konumlar <strong>0 mm</strong> sistem referansina gore tanimlanir. Paralel demet bu noktadan soldan eksene paralel olarak girer.",
+      visualCopyInfinity: "Ustte: sonsuzdan gelen paralel isik isinlari. Altta: eksene yakin noktanin aciklik durdurucusu uzerinden aciklik isin yolu.",
+      imageDiagramBadgeInfinity: "Paralel isinlar",
+      parallelFocusCase: "Eksene paralel bir demetin odagi",
+      originToFirstElement: "Sistem referansi ile ilk eleman arasi",
+      sourceDataTitle: "Kaynak verileri",
+      matrixFocusPlaneLine: "Odak duzlemi: q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_focus = T(q) * M = {matrix}",
+      focusLabel: "Odak",
+      summaryFocusDistanceTitle: "Odak uzakligi",
+      summaryAbsoluteFocusPositionTitle: "Mutlak odak konumu",
+      summaryAbsoluteFocusPositionCopy: "Odak duzleminin sistem referansina gore konumu.",
+      summaryBeamHeightCopy: "Giren paralel demetin z = 0 mm noktasindaki referans yuksekligi.",
+      summaryImageCaseCopyInfinity: "Sonlu nesne goruntulemesi yerine eksene paralel isik icin odak konumunu aciklar.",
+    },
+    ru: {
+      sourceSectionTitle: "Объект / Источник",
+      sourceModeLabel: "Источник",
+      sourceModeObject: "Конечный объект",
+      sourceModeInfinity: "Световые лучи из бесконечности",
+      infinityBeamHeightLabel: "Высота пучка на входе",
+      controlCopyInfinity: "Все осевые положения отсчитываются от начала системы при <strong>0 mm</strong>. Параллельный пучок входит туда слева как осевой свет.",
+      visualCopyInfinity: "Сверху: параллельные лучи из бесконечности. Снизу: ход апертурных лучей от приосевой точки через апертурную диафрагму.",
+      imageDiagramBadgeInfinity: "Параллельные лучи",
+      parallelFocusCase: "Фокус осевого параллельного пучка",
+      originToFirstElement: "От начала системы до первого элемента",
+      sourceDataTitle: "Данные источника",
+      matrixFocusPlaneLine: "Фокальная плоскость: q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_focus = T(q) * M = {matrix}",
+      focusLabel: "Фокус",
+      summaryFocusDistanceTitle: "Фокусное расстояние до плоскости",
+      summaryAbsoluteFocusPositionTitle: "Абсолютное положение фокуса",
+      summaryAbsoluteFocusPositionCopy: "Положение фокальной плоскости относительно начала системы.",
+      summaryBeamHeightCopy: "Опорная высота входящего параллельного пучка при z = 0 mm.",
+      summaryImageCaseCopyInfinity: "Описывает положение фокуса для осевого параллельного света вместо изображения конечного объекта.",
+    },
+    zh: {
+      sourceSectionTitle: "物体 / 光源",
+      sourceModeLabel: "光源",
+      sourceModeObject: "有限物体",
+      sourceModeInfinity: "来自无穷远的光线",
+      infinityBeamHeightLabel: "入射光束高度",
+      controlCopyInfinity: "所有轴向位置都以系统零点 <strong>0 mm</strong> 为基准。平行光束从左侧以轴上光形式进入该位置。",
+      visualCopyInfinity: "上图：来自无穷远的平行光线。下图：近轴点经孔径限制位置的孔径光线路径。",
+      imageDiagramBadgeInfinity: "平行光线",
+      parallelFocusCase: "轴上平行光束的焦点",
+      originToFirstElement: "系统零点到第一个元件",
+      sourceDataTitle: "光源数据",
+      matrixFocusPlaneLine: "焦平面：q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_focus = T(q) * M = {matrix}",
+      focusLabel: "焦点",
+      summaryFocusDistanceTitle: "焦点距离",
+      summaryAbsoluteFocusPositionTitle: "绝对焦点位置",
+      summaryAbsoluteFocusPositionCopy: "焦平面相对于系统零点的位置。",
+      summaryBeamHeightCopy: "入射平行光束在 z = 0 mm 处的参考高度。",
+      summaryImageCaseCopyInfinity: "这里描述的是轴上平行光的聚焦位置，而不是有限物体的成像情况。",
+    },
+    it: {
+      sourceSectionTitle: "Oggetto / Sorgente",
+      sourceModeLabel: "Sorgente",
+      sourceModeObject: "Oggetto finito",
+      sourceModeInfinity: "Raggi luminosi dall'infinito",
+      infinityBeamHeightLabel: "Altezza del fascio in ingresso",
+      controlCopyInfinity: "Tutte le posizioni assiali si riferiscono all'origine del sistema a <strong>0 mm</strong>. Il fascio parallelo entra li da sinistra come luce assiale.",
+      visualCopyInfinity: "Sopra: raggi paralleli dall'infinito. Sotto: percorso dei raggi di apertura del punto vicino all'asse attraverso il diaframma limitante.",
+      imageDiagramBadgeInfinity: "Raggi paralleli",
+      parallelFocusCase: "Fuoco di un fascio parallelo assiale",
+      originToFirstElement: "Origine del sistema al primo elemento",
+      sourceDataTitle: "Dati della sorgente",
+      matrixFocusPlaneLine: "Piano focale: q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_focus = T(q) * M = {matrix}",
+      focusLabel: "Fuoco",
+      summaryFocusDistanceTitle: "Distanza del fuoco",
+      summaryAbsoluteFocusPositionTitle: "Posizione assoluta del fuoco",
+      summaryAbsoluteFocusPositionCopy: "Posizione del piano focale rispetto all'origine del sistema.",
+      summaryBeamHeightCopy: "Altezza di riferimento del fascio parallelo entrante a z = 0 mm.",
+      summaryImageCaseCopyInfinity: "Descrive la posizione del fuoco per luce parallela assiale invece della formazione d'immagine di un oggetto finito.",
+    },
+    bad: {
+      sourceSectionTitle: "Objeggd / Quell",
+      sourceModeLabel: "Quell",
+      sourceModeObject: "Normals Objeggd",
+      sourceModeInfinity: "Lichtstrahle us em Unendliche",
+      infinityBeamHeightLabel: "Strahlheechd am Eintritt",
+      controlCopyInfinity: "All axiali Positione beziehe sich uff dr Syschdemnullpungt bei <strong>0 mm</strong>. S Parallelbuendel kummt do vun links als achsparallels Licht nei.",
+      visualCopyInfinity: "Obe: paralleli Lichtstrahle us em Unendliche. Unde: Oeffnungsstrahlengang vum achsnahe Punkt ueber d Aperturbegrenzung.",
+      imageDiagramBadgeInfinity: "Parallelstrahle",
+      parallelFocusCase: "Fokus vun eme achsparallele Parallelbuendel",
+      originToFirstElement: "Syschdemnullpungt bis s erschte Elemend",
+      sourceDataTitle: "Quelldate",
+      matrixFocusPlaneLine: "Fokusebene: q = -A / C = {distance} mm",
+      matrixFocusPlaneMatrixLine: "M_fokus = T(q) * M = {matrix}",
+      focusLabel: "Fokus",
+      summaryFocusDistanceTitle: "Fokusabstand",
+      summaryAbsoluteFocusPositionTitle: "Absolute Fokusposition",
+      summaryAbsoluteFocusPositionCopy: "Position vun dr Fokusebene relativ zum Syschdemnullpungt.",
+      summaryBeamHeightCopy: "Referenzheechd vum ineifallende Parallelbuendel bei z = 0 mm.",
+      summaryImageCaseCopyInfinity: "Des beschreibt d Fokuslag fir achsparallels Licht statt e normali Objeggdabbildung.",
+    },
+  };
+
+  return getExtraTranslations.cache;
+}
+
+function t(key, params = {}) {
+  const extraTranslations = getExtraTranslations();
+  const fallbackLanguage = I18N.defaultLanguage;
+  const translationSet = I18N.translations[language] || I18N.translations[fallbackLanguage] || {};
+  let template = translationSet[key];
+
+  if (template === undefined) {
+    template = extraTranslations[language]?.[key];
+  }
+  if (template === undefined) {
+    template = I18N.translations[fallbackLanguage]?.[key];
+  }
+  if (template === undefined) {
+    template = extraTranslations[fallbackLanguage]?.[key];
+  }
+  if (typeof template !== "string") {
+    return key;
+  }
+
+  return template.replace(/\{(\w+)\}/g, (_, token) => params[token] ?? "");
+}
+
+function normalizeLanguage() {
+  return "de";
+}
+
+function loadLanguage() {
+  return "de";
+}
+
+function saveLanguage() {}
+
+function getLocale() {
+  return "de-DE";
+}

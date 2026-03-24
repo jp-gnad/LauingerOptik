@@ -37,11 +37,6 @@
         rel="noreferrer"
         aria-label="Lauinger Optik Website &ouml;ffnen"
       >
-        <img
-          class="brand-logo site-toolbar__logo"
-          src="https://www.lauinger-optik.de/content/logo_1189_img_1681802076_source.svg"
-          alt="Lauinger Optik"
-        >
         <span class="site-toolbar__brand-title" aria-hidden="true">LAUINGER OPTIK</span>
       </a>
       <div class="site-toolbar__controls">
@@ -49,14 +44,6 @@
           <span id="languageSwitchCaption" class="language-switch__caption">Sprache</span>
           <select id="languageSelect" class="language-select" aria-label="Sprache ausw&auml;hlen">
             <option value="de">Deutsch</option>
-            <option value="en">English</option>
-            <option value="fr">Fran&ccedil;ais</option>
-            <option value="es">Espa&ntilde;ol</option>
-            <option value="tr">T&uuml;rk&ccedil;e</option>
-            <option value="ru">Russisch</option>
-            <option value="zh">Chinesisch</option>
-            <option value="it">Italiano</option>
-            <option value="bad">Badischer Dialekt</option>
           </select>
         </label>
         <div class="theme-switch">
@@ -102,7 +89,14 @@
             <span id="objectInputUnit" class="pill">Eingabe in mm</span>
           </div>
           <div class="form-grid">
-            <label class="field">
+            <label class="field full-width">
+              <span id="sourceModeLabel">Quelle</span>
+              <select id="sourceMode">
+                <option value="object">Objektabbildung</option>
+                <option value="infinity">Lichtstrahlen aus dem Unendlichen</option>
+              </select>
+            </label>
+            <label id="objectDistanceField" class="field">
               <span id="objectDistanceLabel">Objektabstand vor System</span>
               <input id="objectDistance" type="number" min="1" step="1">
             </label>
